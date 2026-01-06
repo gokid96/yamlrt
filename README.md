@@ -65,14 +65,6 @@ Path syntax:
 * `services[0]` - list index
 * `services[0].name` - map inside list
 
-### Comparison
-
-| | yamlrt | SnakeYAML | Jackson |
-|---|---|---|---|
-| Comment preservation | O | X | X |
-| Format preservation | O | X | X |
-| POJO mapping | X | O | O |
-
 ### Limitations
 
 Not yet supported:
