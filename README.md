@@ -81,7 +81,3 @@ Not yet supported:
 * Flow style (`[a, b, c]`, `{key: value}`)
 * Multi-line strings (`|`, `>`)
 * Anchors (`&`, `*`)
-
-### License
-
-MIT
