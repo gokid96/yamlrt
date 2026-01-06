@@ -21,8 +21,6 @@ server:
 
 yamlrt preserves comments, blank lines, and formatting during modifications.
 
-Inspired by Python's [ruamel.yaml](https://yaml.readthedocs.io/).
-
 ### Features
 
 * Inline comment preservation
