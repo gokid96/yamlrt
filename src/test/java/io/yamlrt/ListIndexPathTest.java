@@ -31,7 +31,7 @@ Services:
     @SuppressWarnings("unchecked")
     void testListIndexAccess() {
         Yamlrt y = new Yamlrt();
-        CommentedMap<String, Object> root = y.load(CONFIG);
+        CommentedMap<String, Object> root = y.loadYaml(CONFIG);
         
         List<Object> services = (List<Object>) root.get("Services");
         CommentedMap<String, Object> service0 = (CommentedMap<String, Object>) services.get(0);
@@ -53,7 +53,7 @@ Services:
     @SuppressWarnings("unchecked")
     void testNestedListAccess() {
         Yamlrt y = new Yamlrt();
-        CommentedMap<String, Object> root = y.load(CONFIG);
+        CommentedMap<String, Object> root = y.loadYaml(CONFIG);
         
         List<Object> services = (List<Object>) root.get("Services");
         CommentedMap<String, Object> service0 = (CommentedMap<String, Object>) services.get(0);
@@ -69,7 +69,7 @@ Services:
     @SuppressWarnings("unchecked")
     void testSetWithListIndex() {
         Yamlrt y = new Yamlrt();
-        CommentedMap<String, Object> root = y.load(CONFIG);
+        CommentedMap<String, Object> root = y.loadYaml(CONFIG);
         
         List<Object> services = (List<Object>) root.get("Services");
         CommentedMap<String, Object> service0 = (CommentedMap<String, Object>) services.get(0);

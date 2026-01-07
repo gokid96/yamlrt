@@ -71,6 +71,17 @@ public class Yamlrt {
         return instance;
     }
     
+    // ==================== Instance Methods (Legacy API) ====================
+    
+    /**
+     * Load YAML string and return root map (legacy instance method)
+     * For new code, prefer static Yamlrt.load(yaml)
+     */
+    public CommentedMap<String, Object> loadYaml(String yaml) {
+        this.root = parser.parse(yaml);
+        return root;
+    }
+    
     // ==================== Getter Methods (Path Notation) ====================
     
     /**

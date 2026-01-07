@@ -78,7 +78,7 @@ RequestTimeout: 4  # PAXLST timeout
     @DisplayName("Round-trip: load and dump without changes")
     void testRoundTripNoChanges() {
         Yamlrt yaml = new Yamlrt();
-        yaml.load(CONFIG);
+        yaml.loadYaml(CONFIG);
         String output = yaml.dump();
         
         System.out.println("=== Original ===");
@@ -101,7 +101,7 @@ RequestTimeout: 4  # PAXLST timeout
     @SuppressWarnings("unchecked")
     void testAddAirline() {
         Yamlrt yaml = new Yamlrt();
-        CommentedMap<String, Object> root = yaml.load(CONFIG);
+        CommentedMap<String, Object> root = yaml.loadYaml(CONFIG);
         
         // Navigate to Services[0].Airline
         List<Object> services = (List<Object>) root.get("Services");
@@ -130,7 +130,7 @@ RequestTimeout: 4  # PAXLST timeout
     @DisplayName("Round-trip: modify value and preserve format")
     void testModifyValue() {
         Yamlrt yaml = new Yamlrt();
-        CommentedMap<String, Object> root = yaml.load(CONFIG);
+        CommentedMap<String, Object> root = yaml.loadYaml(CONFIG);
         
         root.put("RequestTimeout", 10);
         root.put("AirlineCodeCheckEnabled", false);

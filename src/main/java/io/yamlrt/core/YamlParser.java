@@ -59,6 +59,9 @@ public class YamlParser {
         detectIndent();
         root.setDetectedIndent(detectedIndent);
         
+        // Detect trailing newline: if yaml ends with \n, last split element will be empty
+        root.setTrailingNewline(yaml.endsWith("\n"));
+        
         parseMapping(root, 0);
         
         for (CommentToken token : pendingTokens) {
@@ -179,11 +182,11 @@ public class YamlParser {
         int nextIndent = getIndent(nextLine);
         log("parseValue: keyIndent=" + keyIndent + " nextIndent=" + nextIndent + " nextLine='" + nextLine + "'");
         
-        // List item: can be at same level or greater
+        // List item: must be at greater indent than key
+        // OR at same indent if inside a nested structure (ruamel.yaml behavior)
         if (LIST_ITEM_PATTERN.matcher(nextLine).matches()) {
-            // List item must be at greater indent to be a value of this key
-            // Exception: root level key (keyIndent=0) with list at indent 0
-            if (nextIndent > keyIndent || (keyIndent == 0 && nextIndent == 0)) {
+            // List items at same or greater indent are values of this key
+            if (nextIndent >= keyIndent) {
                 CommentedList<Object> list = new CommentedList<>();
                 list.setOriginalIndent(nextIndent);
                 parseSequence(list, nextIndent);

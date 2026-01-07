@@ -22,7 +22,7 @@ Database:
 """;
         
         Yamlrt yaml = new Yamlrt();
-        CommentedMap<String, Object> root = yaml.load(original);
+        CommentedMap<String, Object> root = yaml.loadYaml(original);
         String output = yaml.dump();
         
         System.out.println("=== Original ===");
@@ -47,7 +47,7 @@ Services:
 """;
         
         Yamlrt yaml = new Yamlrt();
-        CommentedMap<String, Object> root = yaml.load(original);
+        CommentedMap<String, Object> root = yaml.loadYaml(original);
         String output = yaml.dump();
         
         System.out.println("=== Original (repr) ===");
@@ -76,7 +76,7 @@ Key3: value3
 """;
         
         Yamlrt yaml = new Yamlrt();
-        CommentedMap<String, Object> root = yaml.load(original);
+        CommentedMap<String, Object> root = yaml.loadYaml(original);
         String output = yaml.dump();
         
         System.out.println("=== Original ===");
@@ -101,7 +101,7 @@ Key2: value2
 """;
         
         Yamlrt yaml = new Yamlrt();
-        CommentedMap<String, Object> root = yaml.load(original);
+        CommentedMap<String, Object> root = yaml.loadYaml(original);
         String output = yaml.dump();
         
         System.out.println("=== Original ===");
@@ -127,7 +127,7 @@ Services:
 """;
         
         Yamlrt yaml = new Yamlrt();
-        CommentedMap<String, Object> root = yaml.load(original);
+        CommentedMap<String, Object> root = yaml.loadYaml(original);
         String output = yaml.dump();
         
         System.out.println("=== Original ===");
@@ -149,7 +149,7 @@ Timeout: 30          # Request timeout
 """;
         
         Yamlrt yaml = new Yamlrt();
-        CommentedMap<String, Object> root = yaml.load(original);
+        CommentedMap<String, Object> root = yaml.loadYaml(original);
         
         // Modify
         root.put("Port", 9090);
@@ -179,7 +179,7 @@ Airlines:
 """;
         
         Yamlrt yaml = new Yamlrt();
-        CommentedMap<String, Object> root = yaml.load(original);
+        CommentedMap<String, Object> root = yaml.loadYaml(original);
         
         java.util.List<Object> airlines = (java.util.List<Object>) root.get("Airlines");
         airlines.add("CC");

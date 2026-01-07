@@ -51,7 +51,14 @@ public class YamlWriter {
             writeCommentToken(token, 0);
         }
         
-        return output.toString();
+        String result = output.toString();
+        
+        // Handle trailing newline based on original
+        if (!root.hasTrailingNewline() && result.endsWith(lineEnding)) {
+            result = result.substring(0, result.length() - lineEnding.length());
+        }
+        
+        return result;
     }
     
     /**
@@ -427,8 +434,11 @@ public class YamlWriter {
     
     private boolean needsQuoting(String str) {
         if (str.isEmpty()) return true;
-        if (str.contains(":") || str.contains("#") || str.contains("\n")) return true;
+        // Colon followed by space is problematic, not colon alone
+        if (str.contains(": ") || str.contains("#") || str.contains("\n")) return true;
         if (str.startsWith(" ") || str.endsWith(" ")) return true;
+        // Colon at end needs quoting
+        if (str.endsWith(":")) return true;
         if (str.equals("true") || str.equals("false") || str.equals("null")) return true;
         if (str.startsWith("\"") || str.startsWith("'")) return true;
         if (str.startsWith("{") || str.startsWith("[")) return true;

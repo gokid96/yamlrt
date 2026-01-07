@@ -22,7 +22,7 @@ Items:
 """;
         
         Yamlrt y = new Yamlrt();
-        CommentedMap<String, Object> root = y.load(yaml);
+        CommentedMap<String, Object> root = y.loadYaml(yaml);
         
         java.util.List<Object> items = (java.util.List<Object>) root.get("Items");
         

@@ -15,6 +15,7 @@ public class CommentedMap<K, V> extends LinkedHashMap<K, V> {
     private boolean flowStyle = false;
     private int detectedIndent = 2;
     private boolean hasDocumentMarker = false;
+    private boolean hasTrailingNewline = true;  // Default: most files have trailing newline
     
     // Line/Column info
     private int line = -1;
@@ -99,6 +100,16 @@ public class CommentedMap<K, V> extends LinkedHashMap<K, V> {
     
     public void setDetectedIndent(int indent) {
         this.detectedIndent = indent;
+    }
+    
+    // ==================== Trailing Newline ====================
+    
+    public boolean hasTrailingNewline() {
+        return hasTrailingNewline;
+    }
+    
+    public void setTrailingNewline(boolean hasTrailingNewline) {
+        this.hasTrailingNewline = hasTrailingNewline;
     }
     
     // ==================== Line/Col ====================

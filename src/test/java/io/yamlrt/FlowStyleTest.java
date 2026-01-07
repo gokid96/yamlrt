@@ -15,7 +15,7 @@ public class FlowStyleTest {
         String yaml = "ports: [8080, 8443, 9000]";
         
         Yamlrt y = new Yamlrt();
-        CommentedMap<String, Object> root = y.load(yaml);
+        CommentedMap<String, Object> root = y.loadYaml(yaml);
         
         @SuppressWarnings("unchecked")
         List<Object> ports = (List<Object>) root.get("ports");
@@ -33,7 +33,7 @@ public class FlowStyleTest {
         String yaml = "labels: {app: nginx, env: prod}";
         
         Yamlrt y = new Yamlrt();
-        CommentedMap<String, Object> root = y.load(yaml);
+        CommentedMap<String, Object> root = y.loadYaml(yaml);
         
         @SuppressWarnings("unchecked")
         Map<String, Object> labels = (Map<String, Object>) root.get("labels");
@@ -52,7 +52,7 @@ public class FlowStyleTest {
         String yaml = "data: [1, [2, 3], {a: b}]";
         
         Yamlrt y = new Yamlrt();
-        CommentedMap<String, Object> root = y.load(yaml);
+        CommentedMap<String, Object> root = y.loadYaml(yaml);
         
         @SuppressWarnings("unchecked")
         List<Object> data = (List<Object>) root.get("data");
@@ -84,7 +84,7 @@ public class FlowStyleTest {
             "  labels: {app: nginx, env: prod}";
         
         Yamlrt y = new Yamlrt();
-        CommentedMap<String, Object> root = y.load(yaml);
+        CommentedMap<String, Object> root = y.loadYaml(yaml);
         
         System.out.println("Input:\n" + yaml);
         
@@ -112,7 +112,7 @@ public class FlowStyleTest {
             "  labels: {app: nginx}";
         
         Yamlrt y = new Yamlrt();
-        y.load(yaml);
+        y.loadYaml(yaml);
         String output = y.dump();
         
         System.out.println("Input:\n" + yaml);
@@ -120,7 +120,7 @@ public class FlowStyleTest {
         
         // Verify output can be re-parsed
         Yamlrt y2 = new Yamlrt();
-        CommentedMap<String, Object> root2 = y2.load(output);
+        CommentedMap<String, Object> root2 = y2.loadYaml(output);
         
         @SuppressWarnings("unchecked")
         CommentedMap<String, Object> server2 = (CommentedMap<String, Object>) root2.get("server");
@@ -136,7 +136,7 @@ public class FlowStyleTest {
         String yaml = "empty_list: []\nempty_map: {}";
         
         Yamlrt y = new Yamlrt();
-        CommentedMap<String, Object> root = y.load(yaml);
+        CommentedMap<String, Object> root = y.loadYaml(yaml);
         
         @SuppressWarnings("unchecked")
         List<Object> emptyList = (List<Object>) root.get("empty_list");
@@ -154,7 +154,7 @@ public class FlowStyleTest {
         String yaml = "data: [\"hello, world\", 'key: value']";
         
         Yamlrt y = new Yamlrt();
-        CommentedMap<String, Object> root = y.load(yaml);
+        CommentedMap<String, Object> root = y.loadYaml(yaml);
         
         @SuppressWarnings("unchecked")
         List<Object> data = (List<Object>) root.get("data");

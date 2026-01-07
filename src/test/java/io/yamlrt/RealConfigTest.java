@@ -90,7 +90,7 @@ LocalRedisURL: redis://:eborder%40@127.0.0.1:7399/3   # Local prod server redis 
     @SuppressWarnings("unchecked")
     void testDebugServicesParsing() {
         Yamlrt yaml = new Yamlrt();
-        CommentedMap<String, Object> root = yaml.load(CONFIG);
+        CommentedMap<String, Object> root = yaml.loadYaml(CONFIG);
         
         System.out.println("=== Debug: Root keys ===");
         for (String key : root.keySet()) {
@@ -121,7 +121,7 @@ LocalRedisURL: redis://:eborder%40@127.0.0.1:7399/3   # Local prod server redis 
     @SuppressWarnings("unchecked")
     void testReadConfig() {
         Yamlrt yaml = new Yamlrt();
-        CommentedMap<String, Object> root = yaml.load(CONFIG);
+        CommentedMap<String, Object> root = yaml.loadYaml(CONFIG);
         
         System.out.println("=== Read Test ===");
         System.out.println("ServerName: " + root.get("ServerName"));
@@ -169,7 +169,7 @@ LocalRedisURL: redis://:eborder%40@127.0.0.1:7399/3   # Local prod server redis 
     @SuppressWarnings("unchecked")
     void testAddAirline() {
         Yamlrt yaml = new Yamlrt();
-        CommentedMap<String, Object> root = yaml.load(CONFIG);
+        CommentedMap<String, Object> root = yaml.loadYaml(CONFIG);
         
         System.out.println("=== Add Airline Test ===");
         
@@ -212,7 +212,7 @@ LocalRedisURL: redis://:eborder%40@127.0.0.1:7399/3   # Local prod server redis 
     @SuppressWarnings("unchecked")
     void testModifyLayer5Address() {
         Yamlrt yaml = new Yamlrt();
-        CommentedMap<String, Object> root = yaml.load(CONFIG);
+        CommentedMap<String, Object> root = yaml.loadYaml(CONFIG);
         
         System.out.println("=== Modify Layer5Address Test ===");
         
@@ -261,7 +261,7 @@ LocalRedisURL: redis://:eborder%40@127.0.0.1:7399/3   # Local prod server redis 
     @DisplayName("Modify boolean and number values")
     void testModifyValues() {
         Yamlrt yaml = new Yamlrt();
-        CommentedMap<String, Object> root = yaml.load(CONFIG);
+        CommentedMap<String, Object> root = yaml.loadYaml(CONFIG);
         
         System.out.println("=== Modify Values Test ===");
         
