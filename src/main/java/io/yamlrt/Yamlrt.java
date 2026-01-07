@@ -211,6 +211,7 @@ public class Yamlrt {
     }
     
     public String dump() {
+        writer.setDocumentMarker(root.hasDocumentMarker());
         return writer.write(root);
     }
     

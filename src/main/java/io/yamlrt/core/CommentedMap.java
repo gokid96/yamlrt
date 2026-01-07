@@ -10,6 +10,7 @@ public class CommentedMap<K, V> extends LinkedHashMap<K, V> {
     private final Set<Integer> blankLines = new LinkedHashSet<>();
     private int detectedIndent = 2;
     private boolean flowStyle = false;
+    private boolean hasDocumentMarker = false;
     
     public CommentedMap() {
         super();
@@ -108,6 +109,15 @@ public class CommentedMap<K, V> extends LinkedHashMap<K, V> {
     
     public void setFlowStyle(boolean flowStyle) {
         this.flowStyle = flowStyle;
+    }
+    
+    // Document marker (---) support
+    public boolean hasDocumentMarker() {
+        return hasDocumentMarker;
+    }
+    
+    public void setDocumentMarker(boolean hasMarker) {
+        this.hasDocumentMarker = hasMarker;
     }
     
     public void insert(int position, K key, V value, String comment) {

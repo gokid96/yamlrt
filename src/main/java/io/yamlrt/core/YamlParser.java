@@ -24,6 +24,9 @@ public class YamlParser {
         
         CommentedMap<String, Object> root = new CommentedMap<>();
         
+        // Detect document marker (---)
+        root.setDocumentMarker(detectDocumentMarker());
+        
         detectIndent();
         root.setDetectedIndent(detectedIndent);
         
@@ -34,6 +37,19 @@ public class YamlParser {
         }
         
         return root;
+    }
+    
+    private boolean detectDocumentMarker() {
+        for (String line : lines) {
+            if (DOCUMENT_START_PATTERN.matcher(line).matches()) {
+                return true;
+            }
+            // Stop looking if we hit actual content
+            if (!isSkippable(line)) {
+                break;
+            }
+        }
+        return false;
     }
     
     private void detectIndent() {
