@@ -442,6 +442,14 @@ public class YamlParser {
         if (value.equalsIgnoreCase("true")) return true;
         if (value.equalsIgnoreCase("false")) return false;
         
+        // Flow Style detection
+        if (value.startsWith("[") && value.endsWith("]")) {
+            return parseFlowSequence(value);
+        }
+        if (value.startsWith("{") && value.endsWith("}")) {
+            return parseFlowMapping(value);
+        }
+        
         try {
             if (value.contains(".")) return Double.parseDouble(value);
             return Long.parseLong(value);
@@ -454,5 +462,185 @@ public class YamlParser {
         }
         
         return value;
+    }
+    
+    // ==================== Flow Style Parsing ====================
+    
+    /**
+     * Parse Flow Sequence: [a, b, c] or [1, [2, 3], {a: b}]
+     */
+    private List<Object> parseFlowSequence(String str) {
+        CommentedList<Object> result = new CommentedList<>();
+        result.setFlowStyle(true);  // Mark as Flow Style
+        
+        // Remove [ ]
+        String content = str.substring(1, str.length() - 1).trim();
+        if (content.isEmpty()) {
+            return result;
+        }
+        
+        // Split by comma (ignore commas inside nested [], {})
+        List<String> items = splitFlowItems(content);
+        
+        for (String item : items) {
+            item = item.trim();
+            if (!item.isEmpty()) {
+                result.add(parseFlowValue(item));
+            }
+        }
+        
+        return result;
+    }
+    
+    /**
+     * Parse Flow Mapping: {key: value, key2: value2}
+     */
+    private Map<String, Object> parseFlowMapping(String str) {
+        CommentedMap<String, Object> result = new CommentedMap<>();
+        result.setFlowStyle(true);  // Mark as Flow Style
+        
+        // Remove { }
+        String content = str.substring(1, str.length() - 1).trim();
+        if (content.isEmpty()) {
+            return result;
+        }
+        
+        // Split by comma
+        List<String> pairs = splitFlowItems(content);
+        
+        for (String pair : pairs) {
+            pair = pair.trim();
+            if (pair.isEmpty()) continue;
+            
+            // Split key: value
+            int colonIndex = findFlowColon(pair);
+            if (colonIndex > 0) {
+                String key = pair.substring(0, colonIndex).trim();
+                String value = pair.substring(colonIndex + 1).trim();
+                
+                // Remove quotes from key
+                if ((key.startsWith("\"") && key.endsWith("\"")) ||
+                    (key.startsWith("'") && key.endsWith("'"))) {
+                    key = key.substring(1, key.length() - 1);
+                }
+                
+                result.put(key, parseFlowValue(value));
+            }
+        }
+        
+        return result;
+    }
+    
+    /**
+     * Parse Flow value (recursive for nested structures)
+     */
+    private Object parseFlowValue(String value) {
+        if (value == null || value.isEmpty()) return null;
+        value = value.trim();
+        
+        // Nested Flow Style
+        if (value.startsWith("[") && value.endsWith("]")) {
+            return parseFlowSequence(value);
+        }
+        if (value.startsWith("{") && value.endsWith("}")) {
+            return parseFlowMapping(value);
+        }
+        
+        // Scalar values
+        if (value.equals("null") || value.equals("~")) return null;
+        if (value.equalsIgnoreCase("true")) return true;
+        if (value.equalsIgnoreCase("false")) return false;
+        
+        try {
+            if (value.contains(".")) return Double.parseDouble(value);
+            return Long.parseLong(value);
+        } catch (NumberFormatException e) {
+        }
+        
+        // Remove quotes
+        if ((value.startsWith("\"") && value.endsWith("\"")) ||
+            (value.startsWith("'") && value.endsWith("'"))) {
+            return value.substring(1, value.length() - 1);
+        }
+        
+        return value;
+    }
+    
+    /**
+     * Split flow content by comma (ignore commas inside nested [], {})
+     */
+    private List<String> splitFlowItems(String content) {
+        List<String> items = new ArrayList<>();
+        StringBuilder current = new StringBuilder();
+        int depth = 0;
+        boolean inSingleQuote = false;
+        boolean inDoubleQuote = false;
+        
+        for (int i = 0; i < content.length(); i++) {
+            char c = content.charAt(i);
+            
+            // Track quote state
+            if (c == '\'' && !inDoubleQuote) {
+                inSingleQuote = !inSingleQuote;
+            } else if (c == '"' && !inSingleQuote) {
+                inDoubleQuote = !inDoubleQuote;
+            }
+            
+            // Track nesting depth (only outside quotes)
+            if (!inSingleQuote && !inDoubleQuote) {
+                if (c == '[' || c == '{') {
+                    depth++;
+                } else if (c == ']' || c == '}') {
+                    depth--;
+                }
+            }
+            
+            // Split on comma (only at top level)
+            if (c == ',' && depth == 0 && !inSingleQuote && !inDoubleQuote) {
+                items.add(current.toString());
+                current = new StringBuilder();
+            } else {
+                current.append(c);
+            }
+        }
+        
+        // Add last item
+        if (current.length() > 0) {
+            items.add(current.toString());
+        }
+        
+        return items;
+    }
+    
+    /**
+     * Find colon position for key:value in Flow Mapping
+     * (ignore colons inside nested [], {})
+     */
+    private int findFlowColon(String str) {
+        int depth = 0;
+        boolean inSingleQuote = false;
+        boolean inDoubleQuote = false;
+        
+        for (int i = 0; i < str.length(); i++) {
+            char c = str.charAt(i);
+            
+            if (c == '\'' && !inDoubleQuote) {
+                inSingleQuote = !inSingleQuote;
+            } else if (c == '"' && !inSingleQuote) {
+                inDoubleQuote = !inDoubleQuote;
+            }
+            
+            if (!inSingleQuote && !inDoubleQuote) {
+                if (c == '[' || c == '{') {
+                    depth++;
+                } else if (c == ']' || c == '}') {
+                    depth--;
+                } else if (c == ':' && depth == 0) {
+                    return i;
+                }
+            }
+        }
+        
+        return -1;
     }
 }
