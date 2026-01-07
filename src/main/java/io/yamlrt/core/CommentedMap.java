@@ -9,6 +9,7 @@ public class CommentedMap<K, V> extends LinkedHashMap<K, V> {
     private final List<CommentToken> endComments = new ArrayList<>();
     private final Set<Integer> blankLines = new LinkedHashSet<>();
     private int detectedIndent = 2;
+    private boolean flowStyle = false;
     
     public CommentedMap() {
         super();
@@ -98,6 +99,15 @@ public class CommentedMap<K, V> extends LinkedHashMap<K, V> {
     
     public void setDetectedIndent(int indent) {
         this.detectedIndent = indent;
+    }
+    
+    // Flow Style support
+    public boolean isFlowStyle() {
+        return flowStyle;
+    }
+    
+    public void setFlowStyle(boolean flowStyle) {
+        this.flowStyle = flowStyle;
     }
     
     public void insert(int position, K key, V value, String comment) {

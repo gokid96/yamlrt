@@ -57,17 +57,37 @@ public class YamlWriter {
                 }
                 output.append(lineEnding);
             } else if (value instanceof CommentedMap) {
-                if (commentInfo != null && commentInfo.hasEndOfLineComment()) {
-                    output.append("  ").append(commentInfo.getEndOfLineComment().getValue());
+                CommentedMap<String, Object> mapValue = (CommentedMap<String, Object>) value;
+                if (mapValue.isFlowStyle()) {
+                    // Output as Flow Style: {key: value}
+                    output.append(" ").append(formatFlowMapping(mapValue));
+                    if (commentInfo != null && commentInfo.hasEndOfLineComment()) {
+                        output.append("  ").append(commentInfo.getEndOfLineComment().getValue());
+                    }
+                    output.append(lineEnding);
+                } else {
+                    if (commentInfo != null && commentInfo.hasEndOfLineComment()) {
+                        output.append("  ").append(commentInfo.getEndOfLineComment().getValue());
+                    }
+                    output.append(lineEnding);
+                    writeMap(mapValue, indent + indentSize);
                 }
-                output.append(lineEnding);
-                writeMap((CommentedMap<String, Object>) value, indent + indentSize);
             } else if (value instanceof CommentedList) {
-                if (commentInfo != null && commentInfo.hasEndOfLineComment()) {
-                    output.append("  ").append(commentInfo.getEndOfLineComment().getValue());
+                CommentedList<Object> listValue = (CommentedList<Object>) value;
+                if (listValue.isFlowStyle()) {
+                    // Output as Flow Style: [a, b, c]
+                    output.append(" ").append(formatFlowSequence(listValue));
+                    if (commentInfo != null && commentInfo.hasEndOfLineComment()) {
+                        output.append("  ").append(commentInfo.getEndOfLineComment().getValue());
+                    }
+                    output.append(lineEnding);
+                } else {
+                    if (commentInfo != null && commentInfo.hasEndOfLineComment()) {
+                        output.append("  ").append(commentInfo.getEndOfLineComment().getValue());
+                    }
+                    output.append(lineEnding);
+                    writeList(listValue, indent + indentSize);
                 }
-                output.append(lineEnding);
-                writeList((CommentedList<Object>) value, indent + indentSize);
             } else if (value instanceof Map) {
                 output.append(lineEnding);
                 writeGenericMap((Map<String, Object>) value, indent + indentSize);
@@ -178,11 +198,98 @@ public class YamlWriter {
         if (value instanceof Boolean) return value.toString();
         if (value instanceof Number) return value.toString();
         
+        // Flow Style List/Map output (when generic Map/List came from Flow parsing)
+        if (value instanceof List && !(value instanceof CommentedList)) {
+            return formatFlowSequence((List<?>) value);
+        }
+        if (value instanceof Map && !(value instanceof CommentedMap)) {
+            return formatFlowMapping((Map<?, ?>) value);
+        }
+        
         String str = value.toString();
         if (needsQuoting(str)) {
             return "\"" + escapeString(str) + "\"";
         }
         return str;
+    }
+    
+    // ==================== Flow Style Output ====================
+    
+    /**
+     * Format Flow Sequence: [a, b, c]
+     */
+    private String formatFlowSequence(List<?> list) {
+        StringBuilder sb = new StringBuilder();
+        sb.append("[");
+        
+        for (int i = 0; i < list.size(); i++) {
+            if (i > 0) sb.append(", ");
+            sb.append(formatFlowValue(list.get(i)));
+        }
+        
+        sb.append("]");
+        return sb.toString();
+    }
+    
+    /**
+     * Format Flow Mapping: {key: value, key2: value2}
+     */
+    private String formatFlowMapping(Map<?, ?> map) {
+        StringBuilder sb = new StringBuilder();
+        sb.append("{");
+        
+        boolean first = true;
+        for (Map.Entry<?, ?> entry : map.entrySet()) {
+            if (!first) sb.append(", ");
+            first = false;
+            
+            String key = entry.getKey().toString();
+            // Quote key if it contains special characters
+            if (needsQuoting(key)) {
+                key = "\"" + escapeString(key) + "\"";
+            }
+            
+            sb.append(key).append(": ").append(formatFlowValue(entry.getValue()));
+        }
+        
+        sb.append("}");
+        return sb.toString();
+    }
+    
+    /**
+     * Format Flow value (recursive)
+     */
+    private String formatFlowValue(Object value) {
+        if (value == null) return "null";
+        if (value instanceof Boolean) return value.toString();
+        if (value instanceof Number) return value.toString();
+        
+        if (value instanceof List) {
+            return formatFlowSequence((List<?>) value);
+        }
+        if (value instanceof Map) {
+            return formatFlowMapping((Map<?, ?>) value);
+        }
+        
+        String str = value.toString();
+        // Quote if contains special characters in Flow context
+        if (needsFlowQuoting(str)) {
+            return "\"" + escapeString(str) + "\"";
+        }
+        return str;
+    }
+    
+    /**
+     * Check if string needs quoting in Flow Style context
+     */
+    private boolean needsFlowQuoting(String str) {
+        if (str.isEmpty()) return true;
+        if (str.contains(",") || str.contains(":") || str.contains("#")) return true;
+        if (str.contains("[") || str.contains("]")) return true;
+        if (str.contains("{") || str.contains("}")) return true;
+        if (str.startsWith(" ") || str.endsWith(" ")) return true;
+        if (str.equals("true") || str.equals("false") || str.equals("null")) return true;
+        return false;
     }
     
     private boolean needsQuoting(String str) {

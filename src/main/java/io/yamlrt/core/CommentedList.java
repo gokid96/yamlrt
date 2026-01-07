@@ -8,6 +8,7 @@ public class CommentedList<E> extends ArrayList<E> {
     private final List<CommentToken> startComments = new ArrayList<>();
     private final List<CommentToken> endComments = new ArrayList<>();
     private final Set<Integer> blankLines = new LinkedHashSet<>();
+    private boolean flowStyle = false;
     
     public CommentedList() {
         super();
@@ -77,6 +78,15 @@ public class CommentedList<E> extends ArrayList<E> {
     
     public void addBlankLine(int lineNumber) {
         blankLines.add(lineNumber);
+    }
+    
+    // Flow Style support
+    public boolean isFlowStyle() {
+        return flowStyle;
+    }
+    
+    public void setFlowStyle(boolean flowStyle) {
+        this.flowStyle = flowStyle;
     }
     
     @Override
