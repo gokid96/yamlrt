@@ -4,7 +4,7 @@ plugins {
 }
 
 group = 'io.yamlrt'
-version = '0.1.0-SNAPSHOT'
+version = '0.1.3'
 
 java {
     sourceCompatibility = JavaVersion.VERSION_17
