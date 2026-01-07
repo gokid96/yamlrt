@@ -2,15 +2,23 @@ package io.yamlrt.core;
 
 import java.util.*;
 
+/**
+ * CommentedMap (ruamel.yaml style)
+ * 
+ * - Based on LinkedHashMap for order preservation
+ * - Comment object for comment/blank line management
+ * - Access via ca property (comment attribute)
+ */
 public class CommentedMap<K, V> extends LinkedHashMap<K, V> {
     
-    private final Map<K, CommentInfo> comments = new LinkedHashMap<>();
-    private final List<CommentToken> startComments = new ArrayList<>();
-    private final List<CommentToken> endComments = new ArrayList<>();
-    private final Set<Integer> blankLines = new LinkedHashSet<>();
-    private int detectedIndent = 2;
+    private Comment ca = new Comment();  // comment attribute
     private boolean flowStyle = false;
+    private int detectedIndent = 2;
     private boolean hasDocumentMarker = false;
+    
+    // Line/Column info
+    private int line = -1;
+    private int col = -1;
     
     public CommentedMap() {
         super();
@@ -20,79 +28,70 @@ public class CommentedMap<K, V> extends LinkedHashMap<K, V> {
         super(m);
     }
     
-    public void setComment(K key, String comment) {
-        CommentInfo info = comments.computeIfAbsent(key, k -> new CommentInfo());
-        info.setEndOfLineComment(comment, -1, -1);
+    // ==================== Comment Attribute (ca) ====================
+    
+    public Comment ca() {
+        return ca;
     }
     
-    public void setCommentBefore(K key, String comment) {
-        CommentInfo info = comments.computeIfAbsent(key, k -> new CommentInfo());
-        info.addPreComment(comment, -1, -1);
+    // ==================== Convenience methods ====================
+    
+    /**
+     * Set end-of-line comment for a key's value
+     */
+    public void setEolComment(K key, String comment) {
+        Comment.CommentSlot slot = ca.getOrCreateSlot(key);
+        slot.setValueEol(CommentToken.comment(comment, 0));
     }
     
-    public void setCommentsBefore(K key, List<String> commentLines) {
-        CommentInfo info = comments.computeIfAbsent(key, k -> new CommentInfo());
-        info.getPreComments().clear();
-        for (String line : commentLines) {
-            info.addPreComment(line, -1, -1);
-        }
-    }
-    
-    public String getComment(K key) {
-        CommentInfo info = comments.get(key);
-        if (info != null && info.hasEndOfLineComment()) {
-            return info.getEndOfLineComment().getContent();
+    /**
+     * Get end-of-line comment for a key's value
+     */
+    public String getEolComment(K key) {
+        Comment.CommentSlot slot = ca.getSlot(key);
+        if (slot != null && slot.getValueEol() != null) {
+            return slot.getValueEol().getContent();
         }
         return null;
     }
     
-    public List<String> getCommentsBefore(K key) {
-        CommentInfo info = comments.get(key);
-        if (info != null && info.hasPreComments()) {
-            List<String> result = new ArrayList<>();
-            for (CommentToken token : info.getPreComments()) {
-                result.add(token.getContent());
-            }
-            return result;
-        }
-        return Collections.emptyList();
+    /**
+     * Add pre-comment (block comment before key)
+     */
+    public void addPreComment(K key, String comment) {
+        Comment.CommentSlot slot = ca.getOrCreateSlot(key);
+        slot.addKeyPre(CommentToken.comment(comment, 0));
     }
     
-    public CommentInfo getCommentInfo(K key) {
-        return comments.get(key);
+    /**
+     * Add blank line before key
+     */
+    public void addBlankLineBefore(K key) {
+        Comment.CommentSlot slot = ca.getOrCreateSlot(key);
+        slot.addKeyPre(CommentToken.blankLine());
     }
     
-    public void setCommentInfo(K key, CommentInfo info) {
-        comments.put(key, info);
+    // ==================== Document marker ====================
+    
+    public boolean hasDocumentMarker() {
+        return hasDocumentMarker;
     }
     
-    public Map<K, CommentInfo> getAllComments() {
-        return Collections.unmodifiableMap(comments);
+    public void setDocumentMarker(boolean hasMarker) {
+        this.hasDocumentMarker = hasMarker;
     }
     
-    public List<CommentToken> getStartComments() {
-        return startComments;
+    // ==================== Flow style ====================
+    
+    public boolean isFlowStyle() {
+        return flowStyle;
     }
     
-    public void addStartComment(String comment) {
-        startComments.add(new CommentToken(comment, -1, 0));
+    public void setFlowStyle(boolean flowStyle) {
+        this.flowStyle = flowStyle;
     }
     
-    public List<CommentToken> getEndComments() {
-        return endComments;
-    }
-    
-    public void addEndComment(String comment) {
-        endComments.add(new CommentToken(comment, -1, 0));
-    }
-    
-    public Set<Integer> getBlankLines() {
-        return blankLines;
-    }
-    
-    public void addBlankLine(int lineNumber) {
-        blankLines.add(lineNumber);
-    }
+    // ==================== Indent ====================
     
     public int getDetectedIndent() {
         return detectedIndent;
@@ -102,65 +101,76 @@ public class CommentedMap<K, V> extends LinkedHashMap<K, V> {
         this.detectedIndent = indent;
     }
     
-    // Flow Style support
-    public boolean isFlowStyle() {
-        return flowStyle;
+    // ==================== Line/Col ====================
+    
+    public int getLine() {
+        return line;
     }
     
-    public void setFlowStyle(boolean flowStyle) {
-        this.flowStyle = flowStyle;
+    public void setLine(int line) {
+        this.line = line;
     }
     
-    // Document marker (---) support
-    public boolean hasDocumentMarker() {
-        return hasDocumentMarker;
+    public int getCol() {
+        return col;
     }
     
-    public void setDocumentMarker(boolean hasMarker) {
-        this.hasDocumentMarker = hasMarker;
+    public void setCol(int col) {
+        this.col = col;
     }
     
-    public void insert(int position, K key, V value, String comment) {
-        List<Map.Entry<K, V>> entries = new ArrayList<>(this.entrySet());
-        this.clear();
-        
-        int i = 0;
-        for (Map.Entry<K, V> entry : entries) {
-            if (i == position) {
-                this.put(key, value);
-                if (comment != null) {
-                    setComment(key, comment);
-                }
+    // ==================== Legacy compatibility ====================
+    
+    @Deprecated
+    public void setCommentInfo(K key, CommentInfo info) {
+        // Convert old CommentInfo to new Comment structure
+        Comment.CommentSlot slot = ca.getOrCreateSlot(key);
+        if (info.hasPreComments()) {
+            for (CommentToken token : info.getPreComments()) {
+                slot.addKeyPre(token);
             }
-            this.put(entry.getKey(), entry.getValue());
-            i++;
         }
-        
-        if (position >= entries.size()) {
-            this.put(key, value);
-            if (comment != null) {
-                setComment(key, comment);
-            }
+        if (info.hasEndOfLineComment()) {
+            slot.setValueEol(info.getEndOfLineComment());
+        }
+        if (info.hasPostComments()) {
+            // Post comments go to value pre of the NEXT key
+            // This is handled during parsing
         }
     }
     
-    @Override
-    public V put(K key, V value) {
-        return super.put(key, value);
+    @Deprecated
+    public CommentInfo getCommentInfo(K key) {
+        Comment.CommentSlot slot = ca.getSlot(key);
+        if (slot == null) return null;
+        
+        CommentInfo info = new CommentInfo();
+        for (CommentToken token : slot.getKeyPre()) {
+            info.addPreComment(token);
+        }
+        if (slot.getValueEol() != null) {
+            info.setEndOfLineComment(slot.getValueEol());
+        }
+        return info;
     }
     
-    @Override
-    public V remove(Object key) {
-        comments.remove(key);
-        return super.remove(key);
+    @Deprecated
+    public List<CommentToken> getStartComments() {
+        return ca.getContainerPre();
     }
     
-    @Override
-    public void clear() {
-        comments.clear();
-        startComments.clear();
-        endComments.clear();
-        blankLines.clear();
-        super.clear();
+    @Deprecated
+    public void addStartComment(String comment) {
+        ca.addContainerPre(CommentToken.comment(comment, 0));
+    }
+    
+    @Deprecated
+    public List<CommentToken> getEndComments() {
+        return ca.getEnd();
+    }
+    
+    @Deprecated
+    public void addEndComment(String comment) {
+        ca.addEnd(CommentToken.comment(comment, 0));
     }
 }

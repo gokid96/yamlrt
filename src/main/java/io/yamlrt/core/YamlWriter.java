@@ -3,13 +3,14 @@ package io.yamlrt.core;
 import java.util.*;
 
 /**
- * YAML Writer - ruamel.yaml 스타일 round-trip 출력
+ * YAML Writer (ruamel.yaml round-trip style)
  * 
- * 핵심 원칙:
- * 1. Block Sequence에서 Map 아이템은 compact 형식 (- key: value)
- * 2. 주석/빈줄 보존
- * 3. 문서 마커 (---) 보존
- * 4. Flow Style ([a,b], {k:v}) 보존
+ * Key principles:
+ * 1. pre comment (blank lines/comments) -> output before key/item
+ * 2. eol comment -> output after value at original column
+ * 3. preserve original indent
+ * 4. compact block sequence (- key: value)
+ * 5. preserve exact blank line count
  */
 public class YamlWriter {
     
@@ -28,324 +29,389 @@ public class YamlWriter {
         this.hasDocumentMarker = hasMarker;
     }
     
-    public String write(CommentedMap<String, Object> map) {
+    public String write(CommentedMap<String, Object> root) {
         output = new StringBuilder();
-        this.indentSize = map.getDetectedIndent();
+        this.indentSize = root.getDetectedIndent();
         
-        // Document start marker
-        if (hasDocumentMarker) {
+        // Document marker
+        if (hasDocumentMarker || root.hasDocumentMarker()) {
             output.append("---").append(lineEnding);
         }
         
-        // Start comments (header)
-        for (CommentToken token : map.getStartComments()) {
-            output.append(token.getValue()).append(lineEnding);
+        // Container pre-comments
+        for (CommentToken token : root.ca().getContainerPre()) {
+            writeCommentToken(token, 0);
         }
         
         // Main content
-        writeMap(map, 0, false);
+        writeMapping(root, 0);
         
         // End comments
-        for (CommentToken token : map.getEndComments()) {
-            output.append(token.getValue()).append(lineEnding);
+        for (CommentToken token : root.ca().getEnd()) {
+            writeCommentToken(token, 0);
         }
         
         return output.toString();
     }
     
     /**
-     * Write Map (Block Style)
-     * @param map Map to write
-     * @param indent current indent level
-     * @param inListItem true if this map is inside a list item (첫 키 이미 출력됨)
+     * Write a mapping (dict)
      */
     @SuppressWarnings("unchecked")
-    private void writeMap(Map<String, Object> map, int indent, boolean inListItem) {
+    private void writeMapping(Map<String, Object> map, int indent) {
         String indentStr = spaces(indent);
-        CommentedMap<String, Object> commented = (map instanceof CommentedMap) ? 
-            (CommentedMap<String, Object>) map : null;
+        Comment ca = (map instanceof CommentedMap) ? ((CommentedMap<String, Object>) map).ca() : null;
         
-        boolean firstKey = true;
         for (Map.Entry<String, Object> entry : map.entrySet()) {
             String key = entry.getKey();
             Object value = entry.getValue();
             
-            CommentInfo commentInfo = (commented != null) ? commented.getCommentInfo(key) : null;
+            Comment.CommentSlot slot = (ca != null) ? ca.getSlot(key) : null;
             
-            // Skip first key if in list item (already written by writeListMapItem)
-            if (inListItem && firstKey) {
-                firstKey = false;
-                continue;
-            }
-            firstKey = false;
-            
-            // Pre-comments (block comments above key)
-            if (commentInfo != null && commentInfo.hasPreComments()) {
-                for (CommentToken token : commentInfo.getPreComments()) {
-                    output.append(indentStr).append(token.getValue()).append(lineEnding);
+            // Pre-comments (blank lines and block comments before key)
+            if (slot != null) {
+                for (CommentToken token : slot.getKeyPre()) {
+                    writeCommentToken(token, indent);
                 }
             }
             
             // Key
             output.append(indentStr).append(key).append(":");
             
-            // Value
-            writeValue(value, indent, commentInfo);
+            // Value with EOL comment
+            CommentToken eolComment = (slot != null) ? slot.getValueEol() : null;
+            writeValue(value, indent, eolComment, key.length() + indent + 1);
         }
     }
     
     /**
-     * Write value after key:
+     * Write a value after "key:"
+     * @param keyEndCol column position after "key:"
      */
     @SuppressWarnings("unchecked")
-    private void writeValue(Object value, int keyIndent, CommentInfo commentInfo) {
+    private void writeValue(Object value, int keyIndent, CommentToken eolComment, int keyEndCol) {
         if (value == null) {
-            appendEndOfLineComment(commentInfo);
+            appendEolComment(eolComment, keyEndCol);
             output.append(lineEnding);
         } else if (value instanceof CommentedMap) {
             CommentedMap<String, Object> mapValue = (CommentedMap<String, Object>) value;
             if (mapValue.isFlowStyle()) {
                 output.append(" ").append(formatFlowMapping(mapValue));
-                appendEndOfLineComment(commentInfo);
+                appendEolComment(eolComment, keyEndCol + 1 + formatFlowMapping(mapValue).length());
                 output.append(lineEnding);
             } else {
-                appendEndOfLineComment(commentInfo);
+                appendEolComment(eolComment, keyEndCol);
                 output.append(lineEnding);
-                writeMap(mapValue, keyIndent + indentSize, false);
+                writeMapping(mapValue, keyIndent + indentSize);
             }
         } else if (value instanceof CommentedList) {
             CommentedList<Object> listValue = (CommentedList<Object>) value;
             if (listValue.isFlowStyle()) {
                 output.append(" ").append(formatFlowSequence(listValue));
-                appendEndOfLineComment(commentInfo);
+                appendEolComment(eolComment, keyEndCol + 1 + formatFlowSequence(listValue).length());
                 output.append(lineEnding);
             } else {
-                appendEndOfLineComment(commentInfo);
+                appendEolComment(eolComment, keyEndCol);
                 output.append(lineEnding);
-                writeList(listValue, keyIndent);
+                writeSequence(listValue, keyIndent);
             }
         } else if (value instanceof Map) {
-            appendEndOfLineComment(commentInfo);
+            appendEolComment(eolComment, keyEndCol);
             output.append(lineEnding);
-            writeMap((Map<String, Object>) value, keyIndent + indentSize, false);
+            writeMapping((Map<String, Object>) value, keyIndent + indentSize);
         } else if (value instanceof List) {
-            appendEndOfLineComment(commentInfo);
+            appendEolComment(eolComment, keyEndCol);
             output.append(lineEnding);
-            writeList((List<Object>) value, keyIndent);
+            writeSequence((List<Object>) value, keyIndent);
         } else {
-            output.append(" ").append(formatScalar(value));
-            appendEndOfLineComment(commentInfo);
+            String scalar = formatScalar(value);
+            output.append(" ").append(scalar);
+            appendEolComment(eolComment, keyEndCol + 1 + scalar.length());
             output.append(lineEnding);
         }
     }
     
     /**
-     * Write List (Block Style)
-     * ruamel.yaml 스타일: Map 아이템은 compact 형식 (- key: value)
+     * Write a sequence (list)
      */
     @SuppressWarnings("unchecked")
-    private void writeList(List<Object> list, int indent) {
-        String indentStr = spaces(indent);
-        CommentedList<Object> commented = (list instanceof CommentedList) ? 
-            (CommentedList<Object>) list : null;
+    private void writeSequence(List<Object> list, int parentIndent) {
+        // Determine actual indent
+        int listIndent = parentIndent + indentSize;
+        if (list instanceof CommentedList) {
+            CommentedList<Object> cl = (CommentedList<Object>) list;
+            if (cl.getOriginalIndent() >= 0) {
+                listIndent = cl.getOriginalIndent();
+            }
+        }
+        
+        String indentStr = spaces(listIndent);
+        Comment ca = (list instanceof CommentedList) ? ((CommentedList<Object>) list).ca() : null;
         
         for (int i = 0; i < list.size(); i++) {
             Object item = list.get(i);
-            CommentInfo commentInfo = (commented != null) ? commented.getCommentInfo(i) : null;
+            Comment.CommentSlot slot = (ca != null) ? ca.getSlot(i) : null;
             
             // Pre-comments
-            if (commentInfo != null && commentInfo.hasPreComments()) {
-                // Add blank line before comment block (between items)
-                if (i > 0) {
-                    output.append(lineEnding);
-                }
-                for (CommentToken token : commentInfo.getPreComments()) {
-                    output.append(token.getValue()).append(lineEnding);
+            if (slot != null) {
+                for (CommentToken token : slot.getKeyPre()) {
+                    writeCommentToken(token, listIndent);
                 }
             }
             
+            // Item
             if (item == null) {
                 output.append(indentStr).append("-");
-                appendEndOfLineComment(commentInfo);
+                appendEolComment(slot != null ? slot.getKeyEol() : null, listIndent + 1);
                 output.append(lineEnding);
             } else if (item instanceof Map) {
-                // Map item: compact format (- key: value)
-                writeListMapItem((Map<String, Object>) item, indent, commentInfo);
+                writeListMapItem((Map<String, Object>) item, listIndent);
             } else if (item instanceof List) {
                 output.append(indentStr).append("-").append(lineEnding);
-                writeList((List<Object>) item, indent + indentSize);
+                writeSequence((List<Object>) item, listIndent);
             } else {
-                output.append(indentStr).append("- ").append(formatScalar(item));
-                appendEndOfLineComment(commentInfo);
+                String scalar = formatScalar(item);
+                output.append(indentStr).append("- ").append(scalar);
+                appendEolComment(slot != null ? slot.getKeyEol() : null, listIndent + 2 + scalar.length());
                 output.append(lineEnding);
             }
         }
     }
     
     /**
-     * Write Map item in list with compact format
-     * Format: - ServiceName: 1A1
-     *           ServiceType: MQ
+     * Write a map item inside a list (compact format)
+     * Format: - key: value
+     *           key2: value2
      */
     @SuppressWarnings("unchecked")
-    private void writeListMapItem(Map<String, Object> map, int listIndent, CommentInfo listItemComment) {
-        String indentStr = spaces(listIndent);
+    private void writeListMapItem(Map<String, Object> map, int listIndent) {
+        String dashIndentStr = spaces(listIndent);
         String contentIndentStr = spaces(listIndent + indentSize);
         
-        CommentedMap<String, Object> commented = (map instanceof CommentedMap) ? 
-            (CommentedMap<String, Object>) map : null;
+        Comment ca = (map instanceof CommentedMap) ? ((CommentedMap<String, Object>) map).ca() : null;
         
         boolean firstKey = true;
+        
         for (Map.Entry<String, Object> entry : map.entrySet()) {
             String key = entry.getKey();
             Object value = entry.getValue();
-            CommentInfo commentInfo = (commented != null) ? commented.getCommentInfo(key) : null;
+            
+            Comment.CommentSlot slot = (ca != null) ? ca.getSlot(key) : null;
             
             if (firstKey) {
-                // First key: - key: value (compact)
-                output.append(indentStr).append("- ").append(key).append(":");
-                writeValueCompact(value, listIndent + indentSize, commentInfo);
+                // First key: "- key:"
+                output.append(dashIndentStr).append("- ").append(key).append(":");
+                CommentToken eolComment = (slot != null) ? slot.getValueEol() : null;
+                int keyEndCol = listIndent + 2 + key.length() + 1;
+                writeValueCompact(value, listIndent + indentSize, eolComment, keyEndCol);
                 firstKey = false;
             } else {
-                // Subsequent keys: indented under dash
-                
-                // Pre-comments
-                if (commentInfo != null && commentInfo.hasPreComments()) {
-                    for (CommentToken token : commentInfo.getPreComments()) {
-                        output.append(contentIndentStr).append(token.getValue()).append(lineEnding);
+                // Pre-comments for subsequent keys
+                if (slot != null) {
+                    for (CommentToken token : slot.getKeyPre()) {
+                        writeCommentToken(token, listIndent + indentSize);
                     }
                 }
                 
+                // Subsequent keys: "  key:"
                 output.append(contentIndentStr).append(key).append(":");
-                writeValueCompact(value, listIndent + indentSize, commentInfo);
+                CommentToken eolComment = (slot != null) ? slot.getValueEol() : null;
+                int keyEndCol = listIndent + indentSize + key.length() + 1;
+                writeValueCompact(value, listIndent + indentSize, eolComment, keyEndCol);
             }
         }
-        
-        // Blank line after each service
-        output.append(lineEnding);
     }
     
     /**
      * Write value in compact context (inside list map item)
+     * NO extra blank line at the end
      */
     @SuppressWarnings("unchecked")
-    private void writeValueCompact(Object value, int keyIndent, CommentInfo commentInfo) {
+    private void writeValueCompact(Object value, int keyIndent, CommentToken eolComment, int keyEndCol) {
         if (value == null) {
-            appendEndOfLineComment(commentInfo);
+            appendEolComment(eolComment, keyEndCol);
             output.append(lineEnding);
         } else if (value instanceof CommentedMap) {
             CommentedMap<String, Object> mapValue = (CommentedMap<String, Object>) value;
             if (mapValue.isFlowStyle()) {
                 output.append(" ").append(formatFlowMapping(mapValue));
-                appendEndOfLineComment(commentInfo);
+                appendEolComment(eolComment, keyEndCol + 1 + formatFlowMapping(mapValue).length());
                 output.append(lineEnding);
             } else {
-                appendEndOfLineComment(commentInfo);
+                appendEolComment(eolComment, keyEndCol);
                 output.append(lineEnding);
-                writeMapInListContext(mapValue, keyIndent + indentSize);
+                writeMappingCompact(mapValue, keyIndent + indentSize);
             }
         } else if (value instanceof CommentedList) {
             CommentedList<Object> listValue = (CommentedList<Object>) value;
             if (listValue.isFlowStyle()) {
                 output.append(" ").append(formatFlowSequence(listValue));
-                appendEndOfLineComment(commentInfo);
+                appendEolComment(eolComment, keyEndCol + 1 + formatFlowSequence(listValue).length());
                 output.append(lineEnding);
             } else {
-                appendEndOfLineComment(commentInfo);
+                appendEolComment(eolComment, keyEndCol);
                 output.append(lineEnding);
-                writeListInListContext(listValue, keyIndent);
+                writeSequenceCompact(listValue, keyIndent);
             }
         } else if (value instanceof Map) {
-            appendEndOfLineComment(commentInfo);
+            appendEolComment(eolComment, keyEndCol);
             output.append(lineEnding);
-            writeMapInListContext((Map<String, Object>) value, keyIndent + indentSize);
+            writeMappingCompact((Map<String, Object>) value, keyIndent + indentSize);
         } else if (value instanceof List) {
-            appendEndOfLineComment(commentInfo);
+            appendEolComment(eolComment, keyEndCol);
             output.append(lineEnding);
-            writeListInListContext((List<Object>) value, keyIndent);
+            writeSequenceCompact((List<Object>) value, keyIndent);
         } else {
-            output.append(" ").append(formatScalar(value));
-            appendEndOfLineComment(commentInfo);
+            String scalar = formatScalar(value);
+            output.append(" ").append(scalar);
+            appendEolComment(eolComment, keyEndCol + 1 + scalar.length());
             output.append(lineEnding);
         }
     }
     
     /**
-     * Write Map inside list context (nested maps)
+     * Write mapping in compact context (no trailing blank line)
      */
     @SuppressWarnings("unchecked")
-    private void writeMapInListContext(Map<String, Object> map, int indent) {
+    private void writeMappingCompact(Map<String, Object> map, int indent) {
         String indentStr = spaces(indent);
-        CommentedMap<String, Object> commented = (map instanceof CommentedMap) ? 
-            (CommentedMap<String, Object>) map : null;
+        Comment ca = (map instanceof CommentedMap) ? ((CommentedMap<String, Object>) map).ca() : null;
         
         for (Map.Entry<String, Object> entry : map.entrySet()) {
             String key = entry.getKey();
             Object value = entry.getValue();
-            CommentInfo commentInfo = (commented != null) ? commented.getCommentInfo(key) : null;
+            
+            Comment.CommentSlot slot = (ca != null) ? ca.getSlot(key) : null;
             
             // Pre-comments
-            if (commentInfo != null && commentInfo.hasPreComments()) {
-                for (CommentToken token : commentInfo.getPreComments()) {
-                    output.append(indentStr).append(token.getValue()).append(lineEnding);
+            if (slot != null) {
+                for (CommentToken token : slot.getKeyPre()) {
+                    writeCommentToken(token, indent);
                 }
             }
             
             output.append(indentStr).append(key).append(":");
-            writeValueCompact(value, indent, commentInfo);
+            CommentToken eolComment = (slot != null) ? slot.getValueEol() : null;
+            int keyEndCol = indent + key.length() + 1;
+            writeValueCompact(value, indent, eolComment, keyEndCol);
         }
     }
     
     /**
-     * Write List inside list context (nested lists)
+     * Write sequence in compact context (no extra trailing blank line)
      */
     @SuppressWarnings("unchecked")
-    private void writeListInListContext(List<Object> list, int indent) {
-        String indentStr = spaces(indent);
-        CommentedList<Object> commented = (list instanceof CommentedList) ? 
-            (CommentedList<Object>) list : null;
+    private void writeSequenceCompact(List<Object> list, int parentIndent) {
+        int listIndent = parentIndent + indentSize;
+        if (list instanceof CommentedList) {
+            CommentedList<Object> cl = (CommentedList<Object>) list;
+            if (cl.getOriginalIndent() >= 0) {
+                listIndent = cl.getOriginalIndent();
+            }
+        }
+        
+        String indentStr = spaces(listIndent);
+        Comment ca = (list instanceof CommentedList) ? ((CommentedList<Object>) list).ca() : null;
         
         for (int i = 0; i < list.size(); i++) {
             Object item = list.get(i);
-            CommentInfo commentInfo = (commented != null) ? commented.getCommentInfo(i) : null;
+            Comment.CommentSlot slot = (ca != null) ? ca.getSlot(i) : null;
             
             // Pre-comments
-            if (commentInfo != null && commentInfo.hasPreComments()) {
-                if (i > 0) {
-                    output.append(lineEnding);
-                }
-                for (CommentToken token : commentInfo.getPreComments()) {
-                    output.append(token.getValue()).append(lineEnding);
+            if (slot != null) {
+                for (CommentToken token : slot.getKeyPre()) {
+                    writeCommentToken(token, listIndent);
                 }
             }
             
             if (item == null) {
                 output.append(indentStr).append("-");
-                appendEndOfLineComment(commentInfo);
+                appendEolComment(slot != null ? slot.getKeyEol() : null, listIndent + 1);
                 output.append(lineEnding);
             } else if (item instanceof Map) {
-                writeListMapItem((Map<String, Object>) item, indent, commentInfo);
+                writeListMapItemCompact((Map<String, Object>) item, listIndent);
             } else if (item instanceof List) {
                 output.append(indentStr).append("-").append(lineEnding);
-                writeListInListContext((List<Object>) item, indent + indentSize);
+                writeSequenceCompact((List<Object>) item, listIndent);
             } else {
-                output.append(indentStr).append("- ").append(formatScalar(item));
-                appendEndOfLineComment(commentInfo);
+                String scalar = formatScalar(item);
+                output.append(indentStr).append("- ").append(scalar);
+                appendEolComment(slot != null ? slot.getKeyEol() : null, listIndent + 2 + scalar.length());
                 output.append(lineEnding);
             }
         }
     }
     
     /**
-     * Append end-of-line comment if present
+     * Write list map item in compact context (no trailing blank line)
      */
-    private void appendEndOfLineComment(CommentInfo commentInfo) {
-        if (commentInfo != null && commentInfo.hasEndOfLineComment()) {
-            output.append("  ").append(commentInfo.getEndOfLineComment().getValue());
+    @SuppressWarnings("unchecked")
+    private void writeListMapItemCompact(Map<String, Object> map, int listIndent) {
+        String dashIndentStr = spaces(listIndent);
+        String contentIndentStr = spaces(listIndent + indentSize);
+        
+        Comment ca = (map instanceof CommentedMap) ? ((CommentedMap<String, Object>) map).ca() : null;
+        
+        boolean firstKey = true;
+        
+        for (Map.Entry<String, Object> entry : map.entrySet()) {
+            String key = entry.getKey();
+            Object value = entry.getValue();
+            
+            Comment.CommentSlot slot = (ca != null) ? ca.getSlot(key) : null;
+            
+            if (firstKey) {
+                output.append(dashIndentStr).append("- ").append(key).append(":");
+                CommentToken eolComment = (slot != null) ? slot.getValueEol() : null;
+                int keyEndCol = listIndent + 2 + key.length() + 1;
+                writeValueCompact(value, listIndent + indentSize, eolComment, keyEndCol);
+                firstKey = false;
+            } else {
+                if (slot != null) {
+                    for (CommentToken token : slot.getKeyPre()) {
+                        writeCommentToken(token, listIndent + indentSize);
+                    }
+                }
+                
+                output.append(contentIndentStr).append(key).append(":");
+                CommentToken eolComment = (slot != null) ? slot.getValueEol() : null;
+                int keyEndCol = listIndent + indentSize + key.length() + 1;
+                writeValueCompact(value, listIndent + indentSize, eolComment, keyEndCol);
+            }
         }
     }
     
-    // ==================== Scalar Formatting ====================
+    // ==================== Comment output ====================
+    
+    private void writeCommentToken(CommentToken token, int defaultIndent) {
+        if (token.isBlankLine()) {
+            output.append(lineEnding);
+        } else {
+            int indent = token.getColumn() >= 0 ? token.getColumn() : defaultIndent;
+            output.append(spaces(indent)).append(token.getValue()).append(lineEnding);
+        }
+    }
+    
+    /**
+     * Append EOL comment at the original column position
+     * @param eolComment the comment token
+     * @param currentCol the current column position (after value)
+     */
+    private void appendEolComment(CommentToken eolComment, int currentCol) {
+        if (eolComment != null && !eolComment.isBlankLine()) {
+            int targetCol = eolComment.getColumn();
+            if (targetCol > currentCol) {
+                // Pad with spaces to reach original column
+                output.append(spaces(targetCol - currentCol));
+            } else {
+                // At least 2 spaces before comment
+                output.append("  ");
+            }
+            output.append(eolComment.getValue());
+        }
+    }
+    
+    // ==================== Scalar formatting ====================
     
     private String formatScalar(Object value) {
         if (value == null) return "";
@@ -364,9 +430,6 @@ public class YamlWriter {
         if (str.contains(":") || str.contains("#") || str.contains("\n")) return true;
         if (str.startsWith(" ") || str.endsWith(" ")) return true;
         if (str.equals("true") || str.equals("false") || str.equals("null")) return true;
-        // Don't quote YES/NO - they're valid YAML 1.1 booleans but we want to preserve them as-is
-        // if (str.equals("yes") || str.equals("no")) return true;
-        // if (str.equals("YES") || str.equals("NO")) return true;
         if (str.startsWith("\"") || str.startsWith("'")) return true;
         if (str.startsWith("{") || str.startsWith("[")) return true;
         if (str.startsWith("*") || str.startsWith("&")) return true;
@@ -382,7 +445,7 @@ public class YamlWriter {
                   .replace("\t", "\\t");
     }
     
-    // ==================== Flow Style Output ====================
+    // ==================== Flow style output ====================
     
     private String formatFlowSequence(List<?> list) {
         StringBuilder sb = new StringBuilder();
@@ -439,6 +502,7 @@ public class YamlWriter {
     // ==================== Utility ====================
     
     private String spaces(int count) {
+        if (count <= 0) return "";
         StringBuilder sb = new StringBuilder();
         for (int i = 0; i < count; i++) {
             sb.append(' ');

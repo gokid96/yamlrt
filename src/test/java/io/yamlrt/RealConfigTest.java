@@ -1,5 +1,7 @@
 package io.yamlrt;
 
+import io.yamlrt.core.CommentedMap;
+import io.yamlrt.core.CommentedList;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.DisplayName;
 
@@ -84,38 +86,113 @@ LocalRedisURL: redis://:eborder%40@127.0.0.1:7399/3   # Local prod server redis 
 """;
 
     @Test
+    @DisplayName("Debug - Check Services parsing")
+    @SuppressWarnings("unchecked")
+    void testDebugServicesParsing() {
+        Yamlrt yaml = new Yamlrt();
+        CommentedMap<String, Object> root = yaml.load(CONFIG);
+        
+        System.out.println("=== Debug: Root keys ===");
+        for (String key : root.keySet()) {
+            Object value = root.get(key);
+            System.out.println("Key: " + key + " -> " + (value != null ? value.getClass().getSimpleName() : "null"));
+        }
+        
+        Object services = root.get("Services");
+        System.out.println("\n=== Debug: Services ===");
+        System.out.println("Services type: " + (services != null ? services.getClass().getName() : "null"));
+        
+        if (services instanceof List) {
+            List<Object> serviceList = (List<Object>) services;
+            System.out.println("Services size: " + serviceList.size());
+            for (int i = 0; i < serviceList.size(); i++) {
+                Object item = serviceList.get(i);
+                System.out.println("  [" + i + "] type: " + (item != null ? item.getClass().getSimpleName() : "null"));
+                if (item instanceof Map) {
+                    Map<String, Object> map = (Map<String, Object>) item;
+                    System.out.println("      keys: " + map.keySet());
+                }
+            }
+        }
+    }
+
+    @Test
     @DisplayName("Read config values")
+    @SuppressWarnings("unchecked")
     void testReadConfig() {
-        Yamlrt yaml = Yamlrt.load(CONFIG);
+        Yamlrt yaml = new Yamlrt();
+        CommentedMap<String, Object> root = yaml.load(CONFIG);
         
         System.out.println("=== Read Test ===");
-        System.out.println("ServerName: " + yaml.getString("ServerName"));
-        System.out.println("Services[0].ServiceName: " + yaml.getString("Services[0].ServiceName"));
-        System.out.println("Services[0].HostToHostHeader: " + yaml.getString("Services[0].HostToHostHeader"));
-        System.out.println("Services[0].Airline: " + yaml.getList("Services[0].Airline"));
-        System.out.println("Services[1].Layer5Address[0].Source: " + yaml.getString("Services[1].Layer5Address[0].Source"));
-        System.out.println("Services[1].Layer5Address[0].Airline: " + yaml.getList("Services[1].Layer5Address[0].Airline"));
-        System.out.println("DestinationLayer5Address: " + yaml.getString("DestinationLayer5Address"));
-        System.out.println("RequestTimeout: " + yaml.getInt("RequestTimeout", 0));
+        System.out.println("ServerName: " + root.get("ServerName"));
+        
+        Object servicesObj = root.get("Services");
+        if (servicesObj == null) {
+            System.out.println("Services is null!");
+            return;
+        }
+        
+        List<Object> services = (List<Object>) servicesObj;
+        System.out.println("Services count: " + services.size());
+        
+        if (services.isEmpty()) {
+            System.out.println("Services is empty!");
+            return;
+        }
+        
+        CommentedMap<String, Object> service0 = (CommentedMap<String, Object>) services.get(0);
+        System.out.println("Services[0].ServiceName: " + service0.get("ServiceName"));
+        System.out.println("Services[0].HostToHostHeader: " + service0.get("HostToHostHeader"));
+        System.out.println("Services[0].Airline: " + service0.get("Airline"));
+        
+        if (services.size() > 1) {
+            CommentedMap<String, Object> service1 = (CommentedMap<String, Object>) services.get(1);
+            System.out.println("Services[1].ServiceName: " + service1.get("ServiceName"));
+            
+            Object layer5Obj = service1.get("Layer5Address");
+            if (layer5Obj instanceof List) {
+                List<Object> layer5Address = (List<Object>) layer5Obj;
+                if (!layer5Address.isEmpty()) {
+                    CommentedMap<String, Object> layer5_0 = (CommentedMap<String, Object>) layer5Address.get(0);
+                    System.out.println("Services[1].Layer5Address[0].Source: " + layer5_0.get("Source"));
+                    System.out.println("Services[1].Layer5Address[0].Airline: " + layer5_0.get("Airline"));
+                }
+            }
+        }
+        
+        System.out.println("DestinationLayer5Address: " + root.get("DestinationLayer5Address"));
+        System.out.println("RequestTimeout: " + root.get("RequestTimeout"));
     }
     
     @Test
     @DisplayName("Add airline to service - comments preserved")
+    @SuppressWarnings("unchecked")
     void testAddAirline() {
-        Yamlrt yaml = Yamlrt.load(CONFIG);
+        Yamlrt yaml = new Yamlrt();
+        CommentedMap<String, Object> root = yaml.load(CONFIG);
         
         System.out.println("=== Add Airline Test ===");
         
-        // Get current airlines
-        List<Object> airlines = yaml.getList("Services[0].Airline");
+        List<Object> services = (List<Object>) root.get("Services");
+        if (services == null || services.isEmpty()) {
+            System.out.println("Services is null or empty!");
+            return;
+        }
+        
+        CommentedMap<String, Object> service0 = (CommentedMap<String, Object>) services.get(0);
+        List<Object> airlines = (List<Object>) service0.get("Airline");
+        
+        if (airlines == null) {
+            System.out.println("Airline list is null!");
+            return;
+        }
+        
         System.out.println("Before: " + airlines);
         
-        // Add new airline
-        List<Object> newAirlines = new ArrayList<>(airlines);
-        newAirlines.add(0, "ZZ");  // Add at beginning
-        yaml.set("Services[0].Airline", newAirlines);
+        // Add new airline at beginning
+        airlines.add(0, "ZZ");
         
-        System.out.println("After: " + yaml.getList("Services[0].Airline"));
+        System.out.println("After: " + airlines);
         
         // Save and check comments preserved
         String output = yaml.dump();
@@ -132,19 +209,46 @@ LocalRedisURL: redis://:eborder%40@127.0.0.1:7399/3   # Local prod server redis 
     
     @Test
     @DisplayName("Modify nested Layer5Address")
+    @SuppressWarnings("unchecked")
     void testModifyLayer5Address() {
-        Yamlrt yaml = Yamlrt.load(CONFIG);
+        Yamlrt yaml = new Yamlrt();
+        CommentedMap<String, Object> root = yaml.load(CONFIG);
         
         System.out.println("=== Modify Layer5Address Test ===");
         
-        // Get current airlines in Layer5Address
-        List<Object> airlines = yaml.getList("Services[1].Layer5Address[0].Airline");
+        List<Object> services = (List<Object>) root.get("Services");
+        if (services == null || services.size() < 2) {
+            System.out.println("Services is null or has fewer than 2 items!");
+            System.out.println("Services: " + services);
+            return;
+        }
+        
+        CommentedMap<String, Object> service1 = (CommentedMap<String, Object>) services.get(1);
+        Object layer5Obj = service1.get("Layer5Address");
+        
+        if (!(layer5Obj instanceof List)) {
+            System.out.println("Layer5Address is not a list: " + layer5Obj);
+            return;
+        }
+        
+        List<Object> layer5Address = (List<Object>) layer5Obj;
+        if (layer5Address.isEmpty()) {
+            System.out.println("Layer5Address is empty!");
+            return;
+        }
+        
+        CommentedMap<String, Object> layer5_0 = (CommentedMap<String, Object>) layer5Address.get(0);
+        List<Object> airlines = (List<Object>) layer5_0.get("Airline");
+        
+        if (airlines == null) {
+            System.out.println("Airline is null!");
+            return;
+        }
+        
         System.out.println("Before: " + airlines);
         
         // Add new airline
-        List<Object> newAirlines = new ArrayList<>(airlines);
-        newAirlines.add("NEW");
-        yaml.set("Services[1].Layer5Address[0].Airline", newAirlines);
+        airlines.add("NEW");
         
         String output = yaml.dump();
         System.out.println("\n=== Output ===");
@@ -156,13 +260,14 @@ LocalRedisURL: redis://:eborder%40@127.0.0.1:7399/3   # Local prod server redis 
     @Test
     @DisplayName("Modify boolean and number values")
     void testModifyValues() {
-        Yamlrt yaml = Yamlrt.load(CONFIG);
+        Yamlrt yaml = new Yamlrt();
+        CommentedMap<String, Object> root = yaml.load(CONFIG);
         
         System.out.println("=== Modify Values Test ===");
         
         // Change values
-        yaml.set("AirlineCodeCheckEnabled", false);
-        yaml.set("RequestTimeout", 10);
+        root.put("AirlineCodeCheckEnabled", false);
+        root.put("RequestTimeout", 10);
         
         String output = yaml.dump();
         System.out.println(output);

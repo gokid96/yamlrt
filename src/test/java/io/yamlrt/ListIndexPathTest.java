@@ -1,5 +1,7 @@
 package io.yamlrt;
 
+import io.yamlrt.core.CommentedMap;
+import io.yamlrt.core.CommentedList;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.DisplayName;
 import static org.assertj.core.api.Assertions.*;
@@ -26,26 +28,37 @@ Services:
 
     @Test
     @DisplayName("List index path: Services[0].ServiceName")
+    @SuppressWarnings("unchecked")
     void testListIndexAccess() {
-        Yamlrt y = Yamlrt.load(CONFIG);
+        Yamlrt y = new Yamlrt();
+        CommentedMap<String, Object> root = y.load(CONFIG);
         
-        System.out.println("ServerName: " + y.getString("ServerName"));
-        System.out.println("Services[0].ServiceName: " + y.getString("Services[0].ServiceName"));
-        System.out.println("Services[0].ServiceType: " + y.getString("Services[0].ServiceType"));
-        System.out.println("Services[1].ServiceName: " + y.getString("Services[1].ServiceName"));
+        List<Object> services = (List<Object>) root.get("Services");
+        CommentedMap<String, Object> service0 = (CommentedMap<String, Object>) services.get(0);
+        CommentedMap<String, Object> service1 = (CommentedMap<String, Object>) services.get(1);
         
-        assertThat(y.getString("ServerName")).isEqualTo("TestServer");
-        assertThat(y.getString("Services[0].ServiceName")).isEqualTo("1A1");
-        assertThat(y.getString("Services[0].ServiceType")).isEqualTo("MQ");
-        assertThat(y.getString("Services[1].ServiceName")).isEqualTo("1E");
+        System.out.println("ServerName: " + root.get("ServerName"));
+        System.out.println("Services[0].ServiceName: " + service0.get("ServiceName"));
+        System.out.println("Services[0].ServiceType: " + service0.get("ServiceType"));
+        System.out.println("Services[1].ServiceName: " + service1.get("ServiceName"));
+        
+        assertThat(root.get("ServerName")).isEqualTo("TestServer");
+        assertThat(service0.get("ServiceName")).isEqualTo("1A1");
+        assertThat(service0.get("ServiceType")).isEqualTo("MQ");
+        assertThat(service1.get("ServiceName")).isEqualTo("1E");
     }
     
     @Test
     @DisplayName("List index path: Services[0].Airline")
+    @SuppressWarnings("unchecked")
     void testNestedListAccess() {
-        Yamlrt y = Yamlrt.load(CONFIG);
+        Yamlrt y = new Yamlrt();
+        CommentedMap<String, Object> root = y.load(CONFIG);
         
-        List<Object> airlines = y.getList("Services[0].Airline");
+        List<Object> services = (List<Object>) root.get("Services");
+        CommentedMap<String, Object> service0 = (CommentedMap<String, Object>) services.get(0);
+        List<Object> airlines = (List<Object>) service0.get("Airline");
+        
         System.out.println("Services[0].Airline: " + airlines);
         
         assertThat(airlines).containsExactly("7C", "AC", "KE");
@@ -53,21 +66,25 @@ Services:
     
     @Test
     @DisplayName("Set value with list index path")
+    @SuppressWarnings("unchecked")
     void testSetWithListIndex() {
-        Yamlrt y = Yamlrt.load(CONFIG);
+        Yamlrt y = new Yamlrt();
+        CommentedMap<String, Object> root = y.load(CONFIG);
+        
+        List<Object> services = (List<Object>) root.get("Services");
+        CommentedMap<String, Object> service0 = (CommentedMap<String, Object>) services.get(0);
         
         // Modify
-        y.set("Services[0].ServiceName", "MODIFIED");
+        service0.put("ServiceName", "MODIFIED");
         
         // Add new airline
-        List<Object> airlines = new ArrayList<>(y.getList("Services[0].Airline"));
+        List<Object> airlines = (List<Object>) service0.get("Airline");
         airlines.add(0, "NEW");
-        y.set("Services[0].Airline", airlines);
         
         System.out.println("Modified output:");
         System.out.println(y.dump());
         
-        assertThat(y.getString("Services[0].ServiceName")).isEqualTo("MODIFIED");
-        assertThat(y.getList("Services[0].Airline")).contains("NEW");
+        assertThat(service0.get("ServiceName")).isEqualTo("MODIFIED");
+        assertThat(airlines).contains("NEW");
     }
 }

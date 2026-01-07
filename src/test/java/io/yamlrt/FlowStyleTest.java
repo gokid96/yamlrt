@@ -1,5 +1,6 @@
 package io.yamlrt;
 
+import io.yamlrt.core.CommentedMap;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.DisplayName;
 import static org.assertj.core.api.Assertions.*;
@@ -13,8 +14,11 @@ public class FlowStyleTest {
     void test1_simpleFlowSequence() {
         String yaml = "ports: [8080, 8443, 9000]";
         
-        Yamlrt y = Yamlrt.load(yaml);
-        List<Object> ports = y.getList("ports");
+        Yamlrt y = new Yamlrt();
+        CommentedMap<String, Object> root = y.load(yaml);
+        
+        @SuppressWarnings("unchecked")
+        List<Object> ports = (List<Object>) root.get("ports");
         
         System.out.println("Input: " + yaml);
         System.out.println("Parsed: " + ports);
@@ -28,8 +32,11 @@ public class FlowStyleTest {
     void test2_simpleFlowMapping() {
         String yaml = "labels: {app: nginx, env: prod}";
         
-        Yamlrt y = Yamlrt.load(yaml);
-        Map<String, Object> labels = y.getMap("labels");
+        Yamlrt y = new Yamlrt();
+        CommentedMap<String, Object> root = y.load(yaml);
+        
+        @SuppressWarnings("unchecked")
+        Map<String, Object> labels = (Map<String, Object>) root.get("labels");
         
         System.out.println("Input: " + yaml);
         System.out.println("Parsed: " + labels);
@@ -44,8 +51,11 @@ public class FlowStyleTest {
     void test3_nestedFlowStyle() {
         String yaml = "data: [1, [2, 3], {a: b}]";
         
-        Yamlrt y = Yamlrt.load(yaml);
-        List<Object> data = y.getList("data");
+        Yamlrt y = new Yamlrt();
+        CommentedMap<String, Object> root = y.load(yaml);
+        
+        @SuppressWarnings("unchecked")
+        List<Object> data = (List<Object>) root.get("data");
         
         System.out.println("Input: " + yaml);
         System.out.println("Parsed: " + data);
@@ -73,16 +83,22 @@ public class FlowStyleTest {
             "  ports: [8080, 8443]\n" +
             "  labels: {app: nginx, env: prod}";
         
-        Yamlrt y = Yamlrt.load(yaml);
+        Yamlrt y = new Yamlrt();
+        CommentedMap<String, Object> root = y.load(yaml);
         
         System.out.println("Input:\n" + yaml);
         
-        assertThat(y.getString("server.host")).isEqualTo("localhost");
+        @SuppressWarnings("unchecked")
+        CommentedMap<String, Object> server = (CommentedMap<String, Object>) root.get("server");
         
-        List<Object> ports = y.getList("server.ports");
+        assertThat(server.get("host")).isEqualTo("localhost");
+        
+        @SuppressWarnings("unchecked")
+        List<Object> ports = (List<Object>) server.get("ports");
         assertThat(ports).containsExactly(8080L, 8443L);
         
-        Map<String, Object> labels = y.getMap("server.labels");
+        @SuppressWarnings("unchecked")
+        Map<String, Object> labels = (Map<String, Object>) server.get("labels");
         assertThat(labels.get("app")).isEqualTo("nginx");
         assertThat(labels.get("env")).isEqualTo("prod");
     }
@@ -95,15 +111,23 @@ public class FlowStyleTest {
             "  ports: [8080, 8443]\n" +
             "  labels: {app: nginx}";
         
-        Yamlrt y = Yamlrt.load(yaml);
+        Yamlrt y = new Yamlrt();
+        y.load(yaml);
         String output = y.dump();
         
         System.out.println("Input:\n" + yaml);
         System.out.println("Output:\n" + output);
         
         // Verify output can be re-parsed
-        Yamlrt y2 = Yamlrt.load(output);
-        assertThat(y2.getList("server.ports")).containsExactly(8080L, 8443L);
+        Yamlrt y2 = new Yamlrt();
+        CommentedMap<String, Object> root2 = y2.load(output);
+        
+        @SuppressWarnings("unchecked")
+        CommentedMap<String, Object> server2 = (CommentedMap<String, Object>) root2.get("server");
+        
+        @SuppressWarnings("unchecked")
+        List<Object> ports2 = (List<Object>) server2.get("ports");
+        assertThat(ports2).containsExactly(8080L, 8443L);
     }
     
     @Test
@@ -111,10 +135,14 @@ public class FlowStyleTest {
     void test6_emptyFlowContainers() {
         String yaml = "empty_list: []\nempty_map: {}";
         
-        Yamlrt y = Yamlrt.load(yaml);
+        Yamlrt y = new Yamlrt();
+        CommentedMap<String, Object> root = y.load(yaml);
         
-        List<Object> emptyList = y.getList("empty_list");
-        Map<String, Object> emptyMap = y.getMap("empty_map");
+        @SuppressWarnings("unchecked")
+        List<Object> emptyList = (List<Object>) root.get("empty_list");
+        
+        @SuppressWarnings("unchecked")
+        Map<String, Object> emptyMap = (Map<String, Object>) root.get("empty_map");
         
         assertThat(emptyList).isEmpty();
         assertThat(emptyMap).isEmpty();
@@ -125,8 +153,11 @@ public class FlowStyleTest {
     void test7_flowWithQuotedStrings() {
         String yaml = "data: [\"hello, world\", 'key: value']";
         
-        Yamlrt y = Yamlrt.load(yaml);
-        List<Object> data = y.getList("data");
+        Yamlrt y = new Yamlrt();
+        CommentedMap<String, Object> root = y.load(yaml);
+        
+        @SuppressWarnings("unchecked")
+        List<Object> data = (List<Object>) root.get("data");
         
         System.out.println("Parsed: " + data);
         

@@ -1,5 +1,7 @@
 package io.yamlrt;
 
+import io.yamlrt.core.CommentedMap;
+import io.yamlrt.core.CommentedList;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.DisplayName;
 
@@ -75,7 +77,8 @@ RequestTimeout: 4  # PAXLST timeout
     @Test
     @DisplayName("Round-trip: load and dump without changes")
     void testRoundTripNoChanges() {
-        Yamlrt yaml = Yamlrt.load(CONFIG);
+        Yamlrt yaml = new Yamlrt();
+        yaml.load(CONFIG);
         String output = yaml.dump();
         
         System.out.println("=== Original ===");
@@ -95,15 +98,20 @@ RequestTimeout: 4  # PAXLST timeout
     
     @Test
     @DisplayName("Round-trip: add airline and preserve format")
+    @SuppressWarnings("unchecked")
     void testAddAirline() {
-        Yamlrt yaml = Yamlrt.load(CONFIG);
+        Yamlrt yaml = new Yamlrt();
+        CommentedMap<String, Object> root = yaml.load(CONFIG);
         
-        // Add airline
-        List<Object> airlines = new ArrayList<>(yaml.getList("Services[0].Airline"));
+        // Navigate to Services[0].Airline
+        List<Object> services = (List<Object>) root.get("Services");
+        CommentedMap<String, Object> service0 = (CommentedMap<String, Object>) services.get(0);
+        List<Object> airlines = (List<Object>) service0.get("Airline");
+        
         System.out.println("Before: " + airlines);
         
-        airlines.add(0, "Z1");  // Add at beginning
-        yaml.set("Services[0].Airline", airlines);
+        // Add airline at beginning
+        airlines.add(0, "Z1");
         
         String output = yaml.dump();
         
@@ -121,10 +129,11 @@ RequestTimeout: 4  # PAXLST timeout
     @Test
     @DisplayName("Round-trip: modify value and preserve format")
     void testModifyValue() {
-        Yamlrt yaml = Yamlrt.load(CONFIG);
+        Yamlrt yaml = new Yamlrt();
+        CommentedMap<String, Object> root = yaml.load(CONFIG);
         
-        yaml.set("RequestTimeout", 10);
-        yaml.set("AirlineCodeCheckEnabled", false);
+        root.put("RequestTimeout", 10);
+        root.put("AirlineCodeCheckEnabled", false);
         
         String output = yaml.dump();
         
@@ -139,6 +148,6 @@ RequestTimeout: 4  # PAXLST timeout
     }
     
     private void verify(String name, boolean passed) {
-        System.out.println(name + ": " + (passed ? "✅" : "❌"));
+        System.out.println(name + ": " + (passed ? "PASS" : "FAIL"));
     }
 }
