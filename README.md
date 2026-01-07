@@ -1,50 +1,20 @@
 # yamlrt
 
-Round-trip YAML editing library for Java with comment and formatting preservation.
+YAML library for Java that preserves comments and formatting.
 
-### Overview
+## Setup
 
-When modifying YAML files with SnakeYAML or Jackson, comments are lost:
-
-```yaml
-# Original
-server:
-  port: 8080  # production port
-```
-
-```yaml
-# After modification with SnakeYAML
-server:
-  port: 9090
-# comments gone
-```
-
-yamlrt preserves comments, blank lines, and formatting during modifications.
-
-### Features
-
-* Inline comment preservation
-* Block comment preservation  
-* Blank line preservation
-* Indent style detection (2/4 spaces)
-* Key order preservation
-* Nested Map/List support
-
-### Setup
-
-JitPack:
-
-```groovy
+```gradle
 repositories {
     maven { url 'https://jitpack.io' }
 }
 
 dependencies {
-    implementation 'com.github.gokid96:yamlrt:0.1.0'
+    implementation 'com.github.gokid96:yamlrt:v0.1.0'
 }
 ```
 
-### Usage
+## Usage
 
 ```java
 Yamlrt yaml = Yamlrt.load(new File("config.yaml"));
@@ -60,14 +30,14 @@ yaml.set("server.port", 9090);
 yaml.save(new File("config.yaml"));
 ```
 
-Path syntax:
-* `server.host` - nested map
-* `services[0]` - list index
-* `services[0].name` - map inside list
+## Features
 
-### Limitations
+- Comment preservation (inline, block)
+- Blank line preservation
+- Flow style support & preservation (`[a, b]`, `{k: v}`)
+- Key order preservation
 
-Not yet supported:
-* Flow style (`[a, b, c]`, `{key: value}`)
-* Multi-line strings (`|`, `>`)
-* Anchors (`&`, `*`)
+## Not Supported
+
+- Multi-line strings (`|`, `>`)
+- Anchors (`&`, `*`)
